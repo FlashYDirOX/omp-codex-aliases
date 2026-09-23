@@ -64,7 +64,14 @@ function runtime(aliases: AliasDefinition[]): AliasRuntimeDeps {
   return {
     loadConfig: () => ({ aliases: [...aliases], errors: [], files: [] }),
     codex: {
-      getProviderDefinition: () => definition,
+      getProviderDefinition: (providerId) =>
+        providerId === "openai-codex-device"
+          ? {
+              ...definition,
+              id: "openai-codex-device",
+              name: "ChatGPT Plus/Pro (Codex, headless/device)",
+            }
+          : definition,
       getBundledModels: () => [sourceModel()],
       fetchCodexModels: async () => ({ models: [] }),
       getCodexAccountId: () => undefined,
@@ -73,10 +80,11 @@ function runtime(aliases: AliasDefinition[]): AliasRuntimeDeps {
 }
 
 describe("registration", () => {
-  test("registers openai-codex-pro", () => {
+  test("registers openai-codex-pro and its headless device login", () => {
     const host = new FakeHost();
     registerAliases(host, runtime([alias("pro")]));
     expect(host.providers.has("openai-codex-pro")).toBe(true);
+    expect(host.providers.has("openai-codex-pro-device")).toBe(true);
     expect(host.providers.has("openai-codex")).toBe(false);
   });
 
@@ -85,7 +93,9 @@ describe("registration", () => {
     registerAliases(host, runtime([alias("pro"), alias("work")]));
     expect([...host.providers.keys()].sort()).toEqual([
       "openai-codex-pro",
+      "openai-codex-pro-device",
       "openai-codex-work",
+      "openai-codex-work-device",
     ]);
     expect(host.providers.get("openai-codex-pro")?.oauth).not.toBe(
       host.providers.get("openai-codex-work")?.oauth,

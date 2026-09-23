@@ -8,6 +8,7 @@ import type {
 } from "@oh-my-pi/pi-ai";
 import {
   buildCodexAlias,
+  CODEX_DEVICE_PROVIDER_ID,
   hydrateAliasModels,
   type CodexDeps,
 } from "../src/codex.js";
@@ -59,9 +60,26 @@ function deps(
       access: `${credentials.access}-refreshed`,
     }),
   };
+  const deviceDefinition: ProviderDefinition = {
+    id: CODEX_DEVICE_PROVIDER_ID,
+    name: "ChatGPT Plus/Pro (Codex, headless/device)",
+    login: async () => ({
+      access: "device-access",
+      refresh: "device-refresh",
+      expires: Date.now() + 60_000,
+      accountId: "device-account",
+    }),
+    refreshToken: (credentials, signal) =>
+      definition.refreshToken!(credentials, signal),
+  };
 
   return {
-    getProviderDefinition: () => definition,
+    getProviderDefinition: (providerId) =>
+      providerId === CODEX_DEVICE_PROVIDER_ID
+        ? deviceDefinition
+        : providerId === "openai-codex"
+          ? definition
+          : undefined,
     getBundledModels: () => [model()],
     fetchCodexModels: async () => ({ models: [] }),
     getCodexAccountId: () => undefined,
@@ -76,6 +94,23 @@ describe("codex adapter", () => {
     expect(built.config.oauth?.name).toContain("Codex Pro");
     expect(built.config.models?.[0]?.id).toBe("gpt-5.6-codex");
     expect(built.config.models?.[0]?.preferWebsockets).toBe(true);
+  });
+
+  test("registers a headless device login that stores into the alias namespace", async () => {
+    const built = buildCodexAlias(alias, deps(), [model()]);
+    expect(built.device?.providerId).toBe("openai-codex-pro-device");
+
+    const oauth = built.device?.config.oauth as
+      | (NonNullable<typeof built.config.oauth> & {
+          storeCredentialsAs?: string;
+        })
+      | undefined;
+    expect(oauth?.name).toContain("headless/device");
+    expect(oauth?.storeCredentialsAs).toBe(alias.providerId);
+
+    const credentials = (await oauth!.login({} as never)) as OAuthCredentials;
+    expect(credentials.access).toBe("device-access");
+    expect(credentials.accountId).toBe("device-account");
   });
 
   test("skips non-chat catalog entries the extension model API cannot represent", () => {

@@ -89,13 +89,13 @@ omp install github:<owner>/omp-sub-alias
 Pin a release tag, branch, or commit with a ref:
 
 ```bash
-omp install github:<owner>/omp-sub-alias#v0.1.0
+omp install github:<owner>/omp-sub-alias#v0.1.1
 ```
 
 A full GitHub URL is also accepted:
 
 ```bash
-omp install https://github.com/<owner>/omp-sub-alias#v0.1.0
+omp install https://github.com/<owner>/omp-sub-alias#v0.1.1
 ```
 
 The package manifest points OMP at `./src/index.ts`, so a GitHub install does
@@ -182,8 +182,17 @@ Start OMP normally and authenticate each provider separately:
 ```text
 /login openai-codex
 /login openai-codex-pro
+/login openai-codex-pro-device
 /login openai-codex-work
+/login openai-codex-work-device
 ```
+
+OMP 18.2.7 also exposes a native device-code flow for headless/SSH use.
+For every alias, the extension registers a login-only `-device` companion.
+For example, `/login openai-codex-pro-device` opens
+`https://auth.openai.com/codex/device` and shows a one-time code. The login
+helper stores the resulting credential under `openai-codex-pro`; it does not
+create a separate model namespace and does not write to stock `openai-codex`.
 
 OMP's own `AuthStorage` owns the credentials. The extension delegates login
 and refresh to OMP's built-in Codex OAuth implementation but registers that

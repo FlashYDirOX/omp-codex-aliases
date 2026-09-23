@@ -1,6 +1,6 @@
 {
   "name": "omp-sub-alias",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Subscription provider aliases for Oh My Pi / OMP.",
   "type": "module",
   "main": "./dist/index.js",

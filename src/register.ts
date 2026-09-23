@@ -57,14 +57,24 @@ export function registerAliases(
       const next = new Set<string>();
 
       for (const alias of loaded.aliases) {
+        let adapters: ProviderRegistration[];
         try {
-          const adapter = adapterFor(alias, deps.codex, sourceModels);
-          pi.registerProvider(alias.providerId, adapter);
-          next.add(alias.providerId);
+          adapters = adaptersFor(alias, deps.codex, sourceModels);
         } catch (error) {
           loaded.errors.push(
             `${alias.providerId}: ${error instanceof Error ? error.message : String(error)}`,
           );
+          continue;
+        }
+        for (const { providerId, config } of adapters) {
+          try {
+            pi.registerProvider(providerId, config);
+            next.add(providerId);
+          } catch (error) {
+            loaded.errors.push(
+              `${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
         }
       }
 
@@ -102,13 +112,22 @@ export function registerAliases(
   );
 }
 
-function adapterFor(
+type ProviderRegistration = {
+  providerId: string;
+  config: ProviderConfig;
+};
+
+function adaptersFor(
   alias: AliasDefinition,
   codex: CodexDeps,
   sourceModels: readonly Model<Api>[],
-): ProviderConfig {
+): ProviderRegistration[] {
   if (alias.provider === CODEX_PROVIDER_ID) {
-    return buildCodexAlias(alias, codex, sourceModels).config;
+    const built = buildCodexAlias(alias, codex, sourceModels);
+    return [
+      { providerId: alias.providerId, config: built.config },
+      ...(built.device ? [built.device] : []),
+    ];
   }
   throw new Error(`unsupported provider: ${alias.provider}`);
 }

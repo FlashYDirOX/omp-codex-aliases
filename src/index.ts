@@ -28,7 +28,9 @@ export {
 } from "./config.js";
 export {
   buildCodexAlias,
+  buildCodexDeviceAlias,
   CODEX_API,
+  CODEX_DEVICE_PROVIDER_ID,
   CODEX_PROVIDER_ID,
   hydrateAliasModels,
   toProviderModelConfig,

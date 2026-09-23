@@ -13,6 +13,7 @@ import type {
 import type { AliasDefinition } from "./config.js";
 
 export const CODEX_PROVIDER_ID = "openai-codex";
+export const CODEX_DEVICE_PROVIDER_ID = "openai-codex-device";
 export const CODEX_API = "openai-codex-responses" as Api;
 
 type CodexModelSpec = ModelSpec<"openai-codex-responses">;
@@ -33,10 +34,20 @@ export interface CodexDeps {
   getCodexAccountId(accessToken: string): string | undefined;
 }
 
+export interface CodexDeviceAliasBuild {
+  providerId: string;
+  config: ProviderConfig;
+}
+
 export interface CodexAliasBuild {
   config: ProviderConfig;
   sourceModels: ReadonlyMap<string, Model<Api>>;
+  device?: CodexDeviceAliasBuild;
 }
+
+type ExtensionOAuthConfig = NonNullable<ProviderConfig["oauth"]> & {
+  storeCredentialsAs?: string;
+};
 
 export function buildCodexAlias(
   alias: AliasDefinition,
@@ -51,6 +62,7 @@ export function buildCodexAlias(
   if (!definition?.login) {
     throw new Error("OMP exposes no openai-codex OAuth login flow");
   }
+  const deviceDefinition = deps.getProviderDefinition(CODEX_DEVICE_PROVIDER_ID);
 
   const seedModels =
     sourceModelsInput ?? deps.getBundledModels(CODEX_PROVIDER_ID);
@@ -60,7 +72,7 @@ export function buildCodexAlias(
       .map((model) => [model.id, cloneModel(model)]),
   );
 
-  const oauth: NonNullable<ProviderConfig["oauth"]> = {
+  const oauth: ExtensionOAuthConfig = {
     name: `${definition.name} — ${alias.label}`,
     login: (callbacks) => definition.login!(callbacks),
     ...(definition.refreshToken
@@ -87,6 +99,11 @@ export function buildCodexAlias(
   if (models.length === 0) {
     throw new Error("OMP exposes no registerable bundled openai-codex models");
   }
+
+  const device =
+    deviceDefinition?.login
+      ? buildCodexDeviceAlias(alias, deviceDefinition)
+      : undefined;
 
   const baseUrl = models[0]!.baseUrl;
   return {
@@ -117,7 +134,40 @@ export function buildCodexAlias(
       },
     },
     sourceModels,
+    ...(device ? { device } : {}),
   };
+}
+
+export function buildCodexDeviceAlias(
+  alias: AliasDefinition,
+  definition: ProviderDefinition,
+): CodexDeviceAliasBuild {
+  if (!definition.login) {
+    throw new Error("OMP exposes no openai-codex device OAuth login flow");
+  }
+
+  const providerId = `${alias.providerId}-device`;
+  const oauth: ExtensionOAuthConfig = {
+    name: `${definition.name} — ${alias.label}`,
+    login: (callbacks) => definition.login!(callbacks),
+    ...(definition.refreshToken
+      ? {
+          refreshToken: (credentials: OAuthCredentials) =>
+            definition.refreshToken!(credentials),
+        }
+      : {}),
+    ...(definition.getApiKey
+      ? {
+          getApiKey: (credentials: OAuthCredentials) =>
+            definition.getApiKey!(credentials),
+        }
+      : {
+          getApiKey: (credentials: OAuthCredentials) => credentials.access,
+        }),
+    storeCredentialsAs: alias.providerId,
+  };
+
+  return { providerId, config: { oauth } };
 }
 
 export function hydrateAliasModels(
